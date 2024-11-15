@@ -13,7 +13,6 @@ class GameRoom {
       i: i,                    // card index
       suit: Math.floor(i/13),  // 0-3 for suits, 4 for jokers
       rank: (i % 13) + 1,      // 1-13 for ranks
-      pos: i,                  // current position
       x: 0,                    // x coordinate
       y: 0,                    // y coordinate
       rot: 0,                  // rotation
@@ -22,12 +21,17 @@ class GameRoom {
   }
 
   initializeDeck() {
-    // Shuffle positions
-    for (let i = this.deck.length - 1; i > 0; i--) {
+    // Create a copy of the deck to shuffle
+    const shuffledDeck = [...this.deck];
+    
+    // Fisher-Yates shuffle
+    for (let i = shuffledDeck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [this.deck[i].pos, this.deck[j].pos] = 
-      [this.deck[j].pos, this.deck[i].pos];
+      [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
     }
+
+    // Update the deck with shuffled cards
+    this.deck = shuffledDeck;
 
     // Send full card state to clients
     this.players.forEach(player => {
@@ -189,15 +193,17 @@ server.on('connection', (socket) => {
 
       case 'move-card':
         if (currentRoom) {
-          // Update card state on server
           const card = currentRoom.deck[data.cardIndex];
           if (card) {
-            card.x = data.x;
-            card.y = data.y;
-            card.rot = data.rot;
-            card.side = data.side;
+            // Simply update card state
+            Object.assign(card, {
+              x: data.x,
+              y: data.y,
+              rot: data.rot,
+              side: data.side
+            });
             
-            // Broadcast move to all other players
+            // Broadcast to other players
             currentRoom.players.forEach(p => {
               if (p.socket && p.socket !== socket && p.socket.readyState === WebSocket.OPEN) {
                 p.socket.send(JSON.stringify({

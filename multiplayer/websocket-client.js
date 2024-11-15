@@ -56,7 +56,6 @@ class GameClient {
               i: serverCard.i,
               rank: serverCard.rank,
               suit: serverCard.suit,
-              pos: serverCard.pos,
               x: serverCard.x,
               y: serverCard.y,
               rot: serverCard.rot
@@ -74,32 +73,29 @@ class GameClient {
             });
           });
   
-          // Sort cards based on server positions
-          this.deck.cards.sort((a, b) => a.pos - b.pos);
-          
-          // Perform shuffle animation without actually reshuffling
+          // Perform shuffle animation with final positions in a neat offset pattern
           this.deck.cards.forEach((card, i) => {
             card.animateTo({
               delay: i * 2,
               duration: 200,
-              x: (Math.random() - 0.5) * 40,
-              y: (Math.random() - 0.5) * 40,
+              x: i * 0.25,  // Small horizontal offset for each card
+              y: i * 0.25,  // Small vertical offset for each card
               rot: 0
             });
           });
           break;
   
         case 'card-moved':
-          console.log('card-moved', data.x, data.y, data.rot, data.side);
           if (this.deck) {
             const card = this.deck.cards[data.cardIndex];
             if (card) {
+              // Directly animate to new position
               card.animateTo({
                 delay: 0,
                 duration: 200,
                 x: data.x,
                 y: data.y,
-                rot: data.rot || 0,
+                rot: data.rot,
                 onComplete: () => {
                   if (data.side) {
                     card.setSide(data.side);
@@ -188,19 +184,12 @@ class GameClient {
     }
   
     onCardDragged(card) {
-      const container = document.getElementById('container');
-      const containerRect = container.getBoundingClientRect();
-      const cardRect = card.$el.getBoundingClientRect();
-      
-      // Calculate position relative to container
-      const x = cardRect.left - containerRect.left;
-      const y = cardRect.top - containerRect.top;
-      
+      // Simplify position calculation by using card's internal x/y values
       this.socket.send(JSON.stringify({
         type: 'move-card',
         cardIndex: card.i,
-        x: x,
-        y: y,
+        x: card.x,
+        y: card.y,
         rot: card.rot,
         side: card.side
       }));
