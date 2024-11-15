@@ -6,6 +6,8 @@ class GameClient {
       this.playerName = '';
       this.roomCode = '';
       this.deck = null;
+      this._lastUpdate = null;
+      this.initializing = true;
     }
   
     connect() {
@@ -49,56 +51,110 @@ class GameClient {
           container.innerHTML = ''; // Clear existing content
           this.deck.mount(container);
           
-          // Apply initial card states from server
-          data.cards.forEach((serverCard, i) => {
-            const card = this.deck.cards[i];
-            Object.assign(card, {
-              i: serverCard.i,
-              rank: serverCard.rank,
-              suit: serverCard.suit,
-              x: serverCard.x,
-              y: serverCard.y,
-              rot: serverCard.rot
-            });
-            card.setSide(serverCard.side);
+          // First apply server's card data
+          data.cards.forEach((serverCard, position) => {
+            const card = this.deck.cards[position];
+            if (card) {
+              card.position = position;
+              card.i = serverCard.i;
+              card.suit = serverCard.suit;
+              card.rank = serverCard.rank;
+              card.side = serverCard.side;
+              card.setSide(card.side);
+              
+              card.x = serverCard.x;
+              card.y = serverCard.y;
+              card.rot = serverCard.rot;
+            }
           });
   
           // Setup card interactions
-          this.deck.cards.forEach(card => {
+          console.log('Setting up card interactions...');
+          this.deck.cards.forEach((card, index) => {
+            console.log(`Setting up card ${index}`);
+            
             card.enableDragging();
             card.enableFlipping();
             
+            // Combine flip and drag handling
+            card.$el.addEventListener('mousedown', () => {
+              // If it's just a click (not a drag), handle as flip
+              const startX = card.x;
+              const startY = card.y;
+              
+              const checkForFlip = setTimeout(() => {
+                if (card.x === startX && card.y === startY) {
+                  // It was a click, not a drag - send flip
+                  this.socket.send(JSON.stringify({
+                    type: 'move-card',
+                    cardIndex: card.position,
+                    x: card.x,
+                    y: card.y,
+                    rot: card.rot,
+                    side: card.side === 'front' ? 'back' : 'front'
+                  }));
+                }
+              }, 100);
+
+              card.$el.addEventListener('mousemove', () => {
+                if (card.isDragging) {
+                  clearTimeout(checkForFlip);  // Cancel flip check if dragging
+                }
+              }, { passive: true, once: true });
+            }, { passive: true });
+
             card.$el.addEventListener('mouseup', () => {
+              console.log(`Card ${card.position} drag ended:`, {
+                x: card.x,
+                y: card.y,
+                rot: card.rot,
+                transform: card.$el.style.transform
+              });
               this.onCardDragged(card);
-            });
+            }, { passive: true });
           });
+          console.log('Card interactions setup complete');
   
-          // Perform shuffle animation with final positions in a neat offset pattern
+          // Add a flag to prevent sending position updates during initial setup
+          this.initializing = true;
+  
+          // Update the shuffle animation to use server positions
           this.deck.cards.forEach((card, i) => {
             card.animateTo({
               delay: i * 2,
               duration: 200,
-              x: i * 0.25,  // Small horizontal offset for each card
-              y: i * 0.25,  // Small vertical offset for each card
-              rot: 0
+              x: card.x,
+              y: card.y,
+              rot: card.rot,
+              onComplete: () => {
+                if (i === this.deck.cards.length - 1) {
+                  // Last card animation completed
+                  this.initializing = false;
+                }
+              }
             });
           });
           break;
   
         case 'card-moved':
           if (this.deck) {
-            const card = this.deck.cards[data.cardIndex];
-            if (card) {
-              // Directly animate to new position
-              card.animateTo({
+            const movedCard = this.deck.cards.find(card => card.position === data.cardIndex);
+            if (movedCard) {
+              // Update the card's actual properties first
+              movedCard.x = data.x;
+              movedCard.y = data.y;
+              movedCard.rot = data.rot;
+              
+              // Then animate to those positions
+              movedCard.animateTo({
                 delay: 0,
-                duration: 200,
+                duration: 100,
                 x: data.x,
                 y: data.y,
                 rot: data.rot,
                 onComplete: () => {
                   if (data.side) {
-                    card.setSide(data.side);
+                    movedCard.setSide(data.side);
                   }
                 }
               });
@@ -184,15 +240,25 @@ class GameClient {
     }
   
     onCardDragged(card) {
-      // Simplify position calculation by using card's internal x/y values
-      this.socket.send(JSON.stringify({
-        type: 'move-card',
-        cardIndex: card.i,
-        x: card.x,
-        y: card.y,
-        rot: card.rot,
-        side: card.side
-      }));
+      // Don't send updates during initialization
+      if (this.initializing) return;
+
+      const transform = card.$el.style.transform;
+      const matches = transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/);
+      
+      if (matches) {
+        const x = parseInt(matches[1], 10);
+        const y = parseInt(matches[2], 10);
+        
+        this.socket.send(JSON.stringify({
+          type: 'move-card',
+          cardIndex: card.position,
+          x: x,
+          y: y,
+          rot: card.rot,
+          side: card.side
+        }));
+      }
     }
   }
   

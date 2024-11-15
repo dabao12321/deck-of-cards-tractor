@@ -8,37 +8,39 @@ class GameRoom {
     this.currentTurn = 0;
     this.gameStarted = false;
     
-    // Track full card state matching deck.js format
+    // Compute suit and rank once during creation
     this.deck = Array(54).fill().map((_, i) => ({
-      i: i,                    // card index
-      suit: Math.floor(i/13),  // 0-3 for suits, 4 for jokers
-      rank: (i % 13) + 1,      // 1-13 for ranks
-      x: 0,                    // x coordinate
-      y: 0,                    // y coordinate
-      rot: 0,                  // rotation
-      side: 'back'             // card face
+      i: i,                    // position
+      suit: Math.floor(i/13),  // 0-3 for suits, 4 for jokers (never changes)
+      rank: (i % 13) + 1,      // 1-13 for ranks (never changes)
+      x: i * 0.25,
+      y: i * 0.25,
+      rot: 0,
+      side: 'back'
     }));
   }
 
   initializeDeck() {
-    // Create a copy of the deck to shuffle
-    const shuffledDeck = [...this.deck];
-    
-    // Fisher-Yates shuffle
-    for (let i = shuffledDeck.length - 1; i > 0; i--) {
+    // Fisher-Yates shuffle of positions only
+    for (let i = this.deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
+      // Swap entire card objects, preserving their suit/rank
+      [this.deck[i], this.deck[j]] = [this.deck[j], this.deck[i]];
+      // Swap x and y positions
+      [this.deck[i].x, this.deck[j].x] = [this.deck[j].x, this.deck[i].x];
+      [this.deck[i].y, this.deck[j].y] = [this.deck[j].y, this.deck[i].y];
     }
 
-    // Update the deck with shuffled cards
-    this.deck = shuffledDeck;
+    // Log the shuffled deck
+    console.log('\n=== Shuffled Deck Order ===');
+    this.deck.forEach((card, index) => {
+      console.log(`Position ${index}: Card ${card.i} (${card.rank} of suit ${card.suit})`);
+    });
+    console.log('========================\n');
 
-    // Send full card state to clients
-    this.players.forEach(player => {
-      player.socket.send(JSON.stringify({
-        type: 'init-deck',
-        cards: this.deck
-      }));
+    this.broadcastToAll({
+      type: 'init-deck',
+      cards: this.deck
     });
   }
 
@@ -195,7 +197,13 @@ server.on('connection', (socket) => {
         if (currentRoom) {
           const card = currentRoom.deck[data.cardIndex];
           if (card) {
-            // Simply update card state
+            // Log the state before update
+            console.log(`Before update - Card position ${data.cardIndex}:`, { ...card });
+            
+            // If this is a flip (side change), we need special handling
+            const isFlip = data.side !== card.side;
+            
+            // Update card state
             Object.assign(card, {
               x: data.x,
               y: data.y,
@@ -203,20 +211,34 @@ server.on('connection', (socket) => {
               side: data.side
             });
             
-            // Broadcast to other players
+            console.log(`After update - Card ${data.cardIndex}:`, { ...card });
+            
+            // Broadcast to OTHER players only (not back to sender)
+            const message = {
+              type: 'card-moved',
+              cardIndex: data.cardIndex,
+              x: data.x,
+              y: data.y,
+              rot: data.rot,
+              side: data.side
+            };
+
+            let broadcastCount = 0;
             currentRoom.players.forEach(p => {
+              // Only send to other players, not the one who made the move
               if (p.socket && p.socket !== socket && p.socket.readyState === WebSocket.OPEN) {
-                p.socket.send(JSON.stringify({
-                  type: 'card-moved',
-                  cardIndex: data.cardIndex,
-                  x: data.x,
-                  y: data.y,
-                  rot: data.rot,
-                  side: data.side
-                }));
+                p.socket.send(JSON.stringify(message));
+                broadcastCount++;
+                console.log(`Successfully broadcast to ${p.name}`);
               }
             });
+            
+            console.log(`Card move broadcast to ${broadcastCount} other players`);
+          } else {
+            console.error(`Invalid card index: ${data.cardIndex}`);
           }
+        } else {
+          console.error('Move-card received but no current room');
         }
         break;
 
