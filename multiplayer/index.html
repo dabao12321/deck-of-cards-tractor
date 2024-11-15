@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HTML5 Deck of Cards</title>
+    <link href="multiplayer.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,300,600|Ubuntu+Condensed" rel="stylesheet" type="text/css">
+  </head>
+  <body>
+    <div id="container"></div>
+    <div id="topbar">
+      <div id="player-info">
+        <span id="player-name"></span>
+        <span id="room-code"></span>
+      </div>
+      <div id="game-info"></div>
+      <div id="game-controls">
+        <input type="text" id="username" placeholder="Enter your name">
+        <button id="create-game">Create Game</button>
+        <input type="text" id="join-code" placeholder="Enter room code">
+        <button id="join-game">Join Game</button>
+      </div>
+    </div>
+    <!-- Add WebSocket client script before other scripts -->
+    <script src="../dist/deck.js"></script>
+    <script type="module" src="./websocket-client.js"></script>
+    <!-- <script src="multiplayer.js"></script> -->
+  </body>
+</html>

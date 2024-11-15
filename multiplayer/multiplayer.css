@@ -40,6 +40,8 @@ body {
   background-color: #334d41;
   padding: 0.25rem;
   text-align: center;
+  user-select: text;  /* Makes text selectable */
+  cursor: text;       /* Shows text cursor on hover */
 }
 #topbar button {
   background: none;
@@ -377,4 +379,19 @@ body {
   html {
     font-size: 125%;
   }
+}
+#player-info, #create-game, .players-list, .players-header, .player-entry {
+    color: rgba(255, 255, 255, 0.9);
+}
+.players-list {
+  padding: 10px;
+}
+
+.players-header {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.player-entry {
+  padding: 2px 0;
 }

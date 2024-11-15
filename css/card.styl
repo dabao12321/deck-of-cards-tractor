@@ -47,14 +47,14 @@
     top: 0
     left: 0
 
-  &.spades, &.clubs, &.joker
+  &.spades, &.clubs, &.joker.rank1
     color: #000000
 
-  &.hearts, &.diamonds, &.joker.rank3
+  &.hearts, &.diamonds, &.joker.rank2
     color: #d40000
 
   &.joker
-    &.rank1, &.rank2, &.rank3
+    &.rank1, &.rank2
       &:before, &:after
         content: "J\a O\a K\a E\a R"
         letter-spacing: 0
@@ -270,10 +270,7 @@
   &.joker
     &.rank1
       .face
-        background-image: url(faces/4_1.svg)
-    &.rank2
-      .face
         background-image: url(faces/4_2.svg)
-    &.rank3
+    &.rank2
       .face
         background-image: url(faces/4_3.svg)
